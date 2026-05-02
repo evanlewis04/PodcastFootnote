@@ -32,18 +32,49 @@
   top: 16px;
   right: 16px;
   z-index: 2147483647;
-  width: min(390px, 34vw);
-  max-height: min(72vh, calc(100% - 32px));
+  width: min(300px, 26vw);
+  max-height: min(48vh, calc(100% - 32px));
   margin: 0;
   box-shadow: 0 16px 48px rgba(6, 10, 18, 0.34);
 }
 
+.footnote-root.is-overlay[data-overlay-size="small"] {
+  width: min(260px, 24vw);
+  max-height: min(40vh, calc(100% - 32px));
+}
+
+.footnote-root.is-overlay[data-overlay-size="medium"] {
+  width: min(340px, 30vw);
+  max-height: min(56vh, calc(100% - 32px));
+}
+
+.footnote-root.is-overlay[data-overlay-size="large"] {
+  width: min(430px, 36vw);
+  max-height: min(72vh, calc(100% - 32px));
+}
+
 :fullscreen .footnote-root.is-overlay,
 :-webkit-full-screen .footnote-root.is-overlay {
-  top: 28px;
-  right: 28px;
-  width: min(430px, 34vw);
-  max-height: calc(100vh - 120px);
+  top: 24px;
+  right: 24px;
+}
+
+:fullscreen .footnote-root.is-overlay[data-overlay-size="small"],
+:-webkit-full-screen .footnote-root.is-overlay[data-overlay-size="small"] {
+  width: min(300px, 24vw);
+  max-height: calc(48vh);
+}
+
+:fullscreen .footnote-root.is-overlay[data-overlay-size="medium"],
+:-webkit-full-screen .footnote-root.is-overlay[data-overlay-size="medium"] {
+  width: min(380px, 30vw);
+  max-height: calc(62vh);
+}
+
+:fullscreen .footnote-root.is-overlay[data-overlay-size="large"],
+:-webkit-full-screen .footnote-root.is-overlay[data-overlay-size="large"] {
+  width: min(480px, 36vw);
+  max-height: calc(76vh);
 }
 
 .footnote-header {
@@ -77,7 +108,9 @@
 }
 
 .footnote-refresh,
-.footnote-mode-toggle,
+.footnote-overlay-toggle,
+.footnote-overlay-close,
+.footnote-size-button,
 .footnote-dismiss {
   border: 1px solid #c8d0dd;
   border-radius: 6px;
@@ -88,16 +121,27 @@
 }
 
 .footnote-refresh,
-.footnote-mode-toggle {
+.footnote-overlay-toggle,
+.footnote-overlay-close,
+.footnote-size-button {
   min-height: 32px;
   padding: 6px 10px;
   font-size: 12px;
 }
 
 .footnote-refresh:hover,
-.footnote-mode-toggle:hover,
+.footnote-overlay-toggle:hover,
+.footnote-overlay-close:hover,
+.footnote-size-button:hover,
 .footnote-dismiss:hover {
   background: #eef3fb;
+}
+
+.footnote-size-button {
+  width: 32px;
+  padding-right: 0;
+  padding-left: 0;
+  font-weight: 700;
 }
 
 .footnote-status {
@@ -128,12 +172,39 @@
 }
 
 .footnote-root.is-overlay .footnote-card-list {
+  max-height: min(calc(48vh - 92px), calc(100vh - 212px));
+}
+
+.footnote-root.is-overlay[data-overlay-size="small"] .footnote-card-list {
+  max-height: min(calc(40vh - 92px), calc(100vh - 212px));
+}
+
+.footnote-root.is-overlay[data-overlay-size="medium"] .footnote-card-list {
+  max-height: min(calc(56vh - 92px), calc(100vh - 212px));
+}
+
+.footnote-root.is-overlay[data-overlay-size="large"] .footnote-card-list {
   max-height: min(calc(72vh - 92px), calc(100vh - 212px));
 }
 
 :fullscreen .footnote-root.is-overlay .footnote-card-list,
 :-webkit-full-screen .footnote-root.is-overlay .footnote-card-list {
-  max-height: calc(100vh - 220px);
+  max-height: calc(48vh - 92px);
+}
+
+:fullscreen .footnote-root.is-overlay[data-overlay-size="small"] .footnote-card-list,
+:-webkit-full-screen .footnote-root.is-overlay[data-overlay-size="small"] .footnote-card-list {
+  max-height: calc(48vh - 92px);
+}
+
+:fullscreen .footnote-root.is-overlay[data-overlay-size="medium"] .footnote-card-list,
+:-webkit-full-screen .footnote-root.is-overlay[data-overlay-size="medium"] .footnote-card-list {
+  max-height: calc(62vh - 92px);
+}
+
+:fullscreen .footnote-root.is-overlay[data-overlay-size="large"] .footnote-card-list,
+:-webkit-full-screen .footnote-root.is-overlay[data-overlay-size="large"] .footnote-card-list {
+  max-height: calc(76vh - 92px);
 }
 
 .footnote-card {

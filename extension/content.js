@@ -1,12 +1,16 @@
 (function () {
   const ROOT_ID = "footnote-root";
+  const OVERLAY_ID = "footnote-overlay-root";
   const DEFAULT_LISTENER_PROFILE =
     "Technically curious generalist. Comfortable with common software, internet, and high-school science vocabulary.";
+  const OVERLAY_SIZES = ["small", "medium", "large"];
 
   let currentVideoId = "";
   let cleanupPlayback = null;
   let routePoller = null;
-  let displayMode = "sidebar";
+  let overlayVisible = false;
+  let overlaySize = "small";
+  let currentCards = [];
 
   function boot() {
     startRouteWatcher();
@@ -15,8 +19,8 @@
 
   function startRouteWatcher() {
     document.addEventListener("yt-navigate-finish", maybeLoadForCurrentPage);
-    document.addEventListener("fullscreenchange", handleDisplayEnvironmentChange);
-    document.addEventListener("webkitfullscreenchange", handleDisplayEnvironmentChange);
+    document.addEventListener("fullscreenchange", updateOverlayPlacement);
+    document.addEventListener("webkitfullscreenchange", updateOverlayPlacement);
 
     if (!routePoller) {
       let lastUrl = location.href;
@@ -42,7 +46,7 @@
 
     currentVideoId = videoId;
     teardown(false);
-    const root = injectPanel();
+    const root = injectSidebar();
     renderState(root, "loading", "Collecting transcript...");
 
     try {
@@ -78,13 +82,6 @@
     }
   }
 
-  function handleDisplayEnvironmentChange() {
-    const root = document.getElementById(ROOT_ID);
-    if (root) {
-      updateRootPlacement(root);
-    }
-  }
-
   async function loadCachedResponse(videoId, knownTerms, originalError) {
     try {
       return await window.FootnoteApi.getCachedTerms(videoId);
@@ -105,13 +102,16 @@
     }
     const existingRoot = document.getElementById(ROOT_ID);
     if (existingRoot) existingRoot.remove();
+    const overlayRoot = document.getElementById(OVERLAY_ID);
+    if (overlayRoot) overlayRoot.remove();
+    currentCards = [];
     if (resetVideoId) currentVideoId = "";
   }
 
-  function injectPanel() {
+  function injectSidebar() {
     const root = document.createElement("aside");
     root.id = ROOT_ID;
-    root.className = "footnote-root";
+    root.className = "footnote-root is-sidebar";
     root.innerHTML = `
       <div class="footnote-header">
         <div>
@@ -119,7 +119,7 @@
           <div class="footnote-subtitle">Glossary cards</div>
         </div>
         <div class="footnote-actions">
-          <button class="footnote-mode-toggle" type="button" title="Move Footnote into the video">Overlay</button>
+          <button class="footnote-overlay-toggle" type="button" title="Show Footnote over the video">Overlay</button>
           <button class="footnote-refresh" type="button" title="Refresh Footnote">Refresh</button>
         </div>
       </div>
@@ -127,9 +127,9 @@
       <div class="footnote-card-list"></div>
     `;
 
-    root.querySelector(".footnote-mode-toggle").addEventListener("click", () => {
-      displayMode = displayMode === "overlay" ? "sidebar" : "overlay";
-      updateRootPlacement(root);
+    root.querySelector(".footnote-overlay-toggle").addEventListener("click", () => {
+      overlayVisible = !overlayVisible;
+      syncOverlay(root);
     });
 
     root.querySelector(".footnote-refresh").addEventListener("click", () => {
@@ -139,18 +139,7 @@
       currentVideoId = previousVideoId;
     });
 
-    updateRootPlacement(root);
-    return root;
-  }
-
-  function updateRootPlacement(root) {
-    const effectiveMode = isFullscreen() ? "overlay" : displayMode;
-    root.classList.toggle("is-overlay", effectiveMode === "overlay");
-    root.classList.toggle("is-sidebar", effectiveMode === "sidebar");
-    root.classList.remove("is-floating");
-    root.dataset.displayMode = effectiveMode;
-
-    const host = effectiveMode === "overlay" ? getOverlayHost() : getSidebarHost();
+    const host = getSidebarHost();
     if (host) {
       host.prepend(root);
     } else {
@@ -158,38 +147,7 @@
       root.classList.add("is-floating");
     }
 
-    updateModeButton(root);
-  }
-
-  function updateModeButton(root) {
-    const button = root.querySelector(".footnote-mode-toggle");
-    if (!button) return;
-
-    if (displayMode === "overlay") {
-      button.textContent = "Sidebar";
-      button.title = "Move Footnote back to YouTube's sidebar";
-    } else {
-      button.textContent = "Overlay";
-      button.title = "Move Footnote into the video";
-    }
-  }
-
-  function getSidebarHost() {
-    return document.querySelector("#secondary-inner") || document.querySelector("#secondary");
-  }
-
-  function getOverlayHost() {
-    return (
-      document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.querySelector("#movie_player") ||
-      document.querySelector(".html5-video-player") ||
-      document.querySelector("#player")
-    );
-  }
-
-  function isFullscreen() {
-    return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+    return root;
   }
 
   function renderState(root, type, message) {
@@ -198,17 +156,21 @@
     const list = root.querySelector(".footnote-card-list");
     status.textContent = message;
     list.innerHTML = "";
+    currentCards = [];
+    syncOverlay(root);
   }
 
   function renderCards(root, cards, cached) {
     const status = root.querySelector(".footnote-status");
     const list = root.querySelector(".footnote-card-list");
     const sortedCards = sortCards(cards);
+    currentCards = sortedCards;
     root.dataset.state = "ready";
 
     if (!sortedCards.length) {
       status.textContent = "No glossary cards for this video.";
       list.innerHTML = "";
+      syncOverlay(root);
       return;
     }
 
@@ -221,9 +183,10 @@
 
     if (cleanupPlayback) cleanupPlayback();
     cleanupPlayback = window.FootnotePlayback.startPlaybackSync(root, sortedCards);
+    syncOverlay(root);
   }
 
-  function createCard(card) {
+  function createCard(card, options = {}) {
     const article = document.createElement("article");
     article.className = "footnote-card";
     article.dataset.cardId = card.id;
@@ -240,15 +203,134 @@
       ${expansion}
       <p class="footnote-one-liner">${escapeHtml(card.one_liner || "")}</p>
       <p class="footnote-deeper">${escapeHtml(card.deeper || "")}</p>
-      <button class="footnote-dismiss" type="button">I know this</button>
+      ${options.readOnly ? "" : '<button class="footnote-dismiss" type="button">I know this</button>'}
     `;
 
-    article.querySelector(".footnote-dismiss").addEventListener("click", async () => {
-      await window.FootnoteStorage.saveKnownTerm(card.term);
-      article.remove();
-    });
+    if (!options.readOnly) {
+      article.querySelector(".footnote-dismiss").addEventListener("click", async () => {
+        await window.FootnoteStorage.saveKnownTerm(card.term);
+        removeCard(card.id);
+      });
+    }
 
     return article;
+  }
+
+  function syncOverlay(sidebarRoot = document.getElementById(ROOT_ID)) {
+    updateOverlayButton(sidebarRoot);
+
+    if (!overlayVisible) {
+      removeOverlay();
+      return;
+    }
+
+    const overlayRoot = ensureOverlay();
+    overlayRoot.dataset.state = sidebarRoot ? sidebarRoot.dataset.state || "ready" : "ready";
+    overlayRoot.dataset.overlaySize = overlaySize;
+    overlayRoot.querySelector(".footnote-status").textContent = sidebarRoot
+      ? sidebarRoot.querySelector(".footnote-status").textContent
+      : "";
+
+    const list = overlayRoot.querySelector(".footnote-card-list");
+    list.innerHTML = "";
+    for (const card of currentCards) {
+      const sidebarCard = sidebarRoot ? sidebarRoot.querySelector(`.footnote-card[data-card-id="${cssEscape(card.id)}"]`) : null;
+      const cardElement = createCard(card, { readOnly: true });
+      cardElement.classList.toggle("is-active", Boolean(sidebarCard && sidebarCard.classList.contains("is-active")));
+      list.append(cardElement);
+    }
+
+    updateOverlayPlacement();
+  }
+
+  function ensureOverlay() {
+    let overlayRoot = document.getElementById(OVERLAY_ID);
+    if (overlayRoot) return overlayRoot;
+
+    overlayRoot = document.createElement("aside");
+    overlayRoot.id = OVERLAY_ID;
+    overlayRoot.className = "footnote-root footnote-overlay-root is-overlay";
+    overlayRoot.innerHTML = `
+      <div class="footnote-header">
+        <div>
+          <div class="footnote-title">Footnote</div>
+          <div class="footnote-subtitle">Video overlay</div>
+        </div>
+        <div class="footnote-actions">
+          <button class="footnote-size-button" data-size-action="smaller" type="button" title="Make overlay smaller">-</button>
+          <button class="footnote-size-button" data-size-action="larger" type="button" title="Make overlay larger">+</button>
+          <button class="footnote-overlay-close" type="button" title="Hide video overlay">Hide</button>
+        </div>
+      </div>
+      <div class="footnote-status" role="status"></div>
+      <div class="footnote-card-list"></div>
+    `;
+
+    overlayRoot.querySelector('[data-size-action="smaller"]').addEventListener("click", () => {
+      resizeOverlay(-1);
+    });
+    overlayRoot.querySelector('[data-size-action="larger"]').addEventListener("click", () => {
+      resizeOverlay(1);
+    });
+    overlayRoot.querySelector(".footnote-overlay-close").addEventListener("click", () => {
+      overlayVisible = false;
+      syncOverlay();
+    });
+
+    return overlayRoot;
+  }
+
+  function updateOverlayPlacement() {
+    const overlayRoot = document.getElementById(OVERLAY_ID);
+    if (!overlayRoot || !overlayVisible) return;
+
+    const host = getOverlayHost();
+    if (host) {
+      host.append(overlayRoot);
+    } else {
+      document.body.append(overlayRoot);
+      overlayRoot.classList.add("is-floating");
+    }
+  }
+
+  function removeOverlay() {
+    const overlayRoot = document.getElementById(OVERLAY_ID);
+    if (overlayRoot) overlayRoot.remove();
+  }
+
+  function resizeOverlay(direction) {
+    const currentIndex = OVERLAY_SIZES.indexOf(overlaySize);
+    const nextIndex = Math.min(Math.max(currentIndex + direction, 0), OVERLAY_SIZES.length - 1);
+    overlaySize = OVERLAY_SIZES[nextIndex];
+    syncOverlay();
+  }
+
+  function removeCard(cardId) {
+    currentCards = currentCards.filter((card) => card.id !== cardId);
+    document.querySelectorAll(`.footnote-card[data-card-id="${cssEscape(cardId)}"]`).forEach((card) => card.remove());
+    syncOverlay();
+  }
+
+  function updateOverlayButton(root) {
+    if (!root) return;
+    const button = root.querySelector(".footnote-overlay-toggle");
+    if (!button) return;
+    button.textContent = overlayVisible ? "Hide overlay" : "Overlay";
+    button.title = overlayVisible ? "Hide Footnote over the video" : "Show Footnote over the video";
+  }
+
+  function getSidebarHost() {
+    return document.querySelector("#secondary-inner") || document.querySelector("#secondary");
+  }
+
+  function getOverlayHost() {
+    return (
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.querySelector("#movie_player") ||
+      document.querySelector(".html5-video-player") ||
+      document.querySelector("#player")
+    );
   }
 
   function sortCards(cards) {
@@ -275,6 +357,13 @@
     const minutes = Math.floor(totalSeconds / 60);
     const remainingSeconds = totalSeconds % 60;
     return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+
+  function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === "function") {
+      return window.CSS.escape(value);
+    }
+    return String(value).replace(/["\\]/g, "\\$&");
   }
 
   function escapeHtml(value) {
