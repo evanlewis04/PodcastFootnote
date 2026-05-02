@@ -29,8 +29,9 @@
 
 .footnote-root.is-overlay {
   position: fixed;
-  top: var(--footnote-overlay-top, 96px);
-  right: var(--footnote-overlay-right, 16px);
+  top: 96px;
+  left: auto;
+  right: 16px;
   z-index: 2147483647;
   width: min(300px, 26vw);
   max-height: min(48vh, calc(100vh - 32px));
@@ -40,8 +41,6 @@
 
 .footnote-root.is-overlay.is-fullscreen {
   position: absolute;
-  top: 24px;
-  right: 24px;
 }
 
 .footnote-root.is-overlay[data-overlay-size="small"] {

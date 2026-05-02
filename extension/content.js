@@ -4,6 +4,11 @@
   const DEFAULT_LISTENER_PROFILE =
     "Technically curious generalist. Comfortable with common software, internet, and high-school science vocabulary.";
   const OVERLAY_SIZES = ["small", "medium", "large"];
+  const OVERLAY_DIMENSIONS = {
+    small: { width: 280, heightRatio: 0.4 },
+    medium: { width: 360, heightRatio: 0.56 },
+    large: { width: 460, heightRatio: 0.72 },
+  };
 
   let currentVideoId = "";
   let cleanupPlayback = null;
@@ -227,6 +232,7 @@
     }
 
     const overlayRoot = ensureOverlay();
+    applyOverlayBaseStyles(overlayRoot);
     overlayRoot.dataset.state = sidebarRoot ? sidebarRoot.dataset.state || "ready" : "ready";
     overlayRoot.dataset.overlaySize = overlaySize;
     overlayRoot.querySelector(".footnote-status").textContent = sidebarRoot
@@ -252,6 +258,7 @@
     overlayRoot = document.createElement("aside");
     overlayRoot.id = OVERLAY_ID;
     overlayRoot.className = "footnote-root footnote-overlay-root is-overlay";
+    applyOverlayBaseStyles(overlayRoot);
     overlayRoot.innerHTML = `
       <div class="footnote-header">
         <div>
@@ -286,32 +293,66 @@
     const overlayRoot = document.getElementById(OVERLAY_ID);
     if (!overlayRoot || !overlayVisible) return;
 
+    applyOverlayBaseStyles(overlayRoot);
     overlayRoot.classList.remove("is-floating");
     const fullscreenHost = document.fullscreenElement || document.webkitFullscreenElement;
     if (fullscreenHost) {
       overlayRoot.classList.add("is-fullscreen");
-      overlayRoot.style.removeProperty("--footnote-overlay-top");
-      overlayRoot.style.removeProperty("--footnote-overlay-right");
+      overlayRoot.style.position = "absolute";
+      positionOverlayInRect(overlayRoot, fullscreenHost.getBoundingClientRect(), true);
       fullscreenHost.append(overlayRoot);
     } else {
       overlayRoot.classList.remove("is-fullscreen");
       positionOverlayOverVideo(overlayRoot);
-      document.body.append(overlayRoot);
+      document.documentElement.append(overlayRoot);
     }
   }
 
   function positionOverlayOverVideo(overlayRoot) {
     const videoBox = getVideoBox();
     if (!videoBox) {
-      overlayRoot.style.setProperty("--footnote-overlay-top", "96px");
-      overlayRoot.style.setProperty("--footnote-overlay-right", "16px");
+      positionOverlayInViewport(overlayRoot);
       return;
     }
 
-    const top = Math.max(videoBox.top + 16, 16);
-    const right = Math.max(window.innerWidth - videoBox.right + 16, 16);
-    overlayRoot.style.setProperty("--footnote-overlay-top", `${Math.round(top)}px`);
-    overlayRoot.style.setProperty("--footnote-overlay-right", `${Math.round(right)}px`);
+    positionOverlayInRect(overlayRoot, videoBox, false);
+  }
+
+  function positionOverlayInViewport(overlayRoot) {
+    const dimensions = getOverlayDimensions(window.innerWidth, window.innerHeight);
+    overlayRoot.style.top = "96px";
+    overlayRoot.style.left = `${Math.max(window.innerWidth - dimensions.width - 24, 16)}px`;
+    overlayRoot.style.width = `${dimensions.width}px`;
+    overlayRoot.style.maxHeight = `${dimensions.height}px`;
+  }
+
+  function positionOverlayInRect(overlayRoot, rect, fullscreen) {
+    const dimensions = getOverlayDimensions(rect.width, rect.height);
+    const inset = fullscreen ? 28 : 18;
+    const top = Math.max(rect.top + inset, inset);
+    const left = Math.max(rect.right - dimensions.width - inset, inset);
+    overlayRoot.style.top = `${Math.round(top)}px`;
+    overlayRoot.style.left = `${Math.round(left)}px`;
+    overlayRoot.style.right = "auto";
+    overlayRoot.style.width = `${dimensions.width}px`;
+    overlayRoot.style.maxHeight = `${dimensions.height}px`;
+  }
+
+  function getOverlayDimensions(containerWidth, containerHeight) {
+    const size = OVERLAY_DIMENSIONS[overlaySize] || OVERLAY_DIMENSIONS.small;
+    const width = Math.min(size.width, Math.max(containerWidth * 0.38, 240), window.innerWidth - 32);
+    const height = Math.min(Math.max(containerHeight * size.heightRatio, 180), window.innerHeight - 120);
+    return { width: Math.round(width), height: Math.round(height) };
+  }
+
+  function applyOverlayBaseStyles(overlayRoot) {
+    overlayRoot.style.display = "block";
+    overlayRoot.style.visibility = "visible";
+    overlayRoot.style.opacity = "1";
+    overlayRoot.style.pointerEvents = "auto";
+    overlayRoot.style.position = "fixed";
+    overlayRoot.style.zIndex = "2147483647";
+    overlayRoot.style.margin = "0";
   }
 
   function getVideoBox() {
