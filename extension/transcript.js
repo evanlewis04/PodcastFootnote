@@ -16,7 +16,11 @@
 
     const track = findCaptionTrack();
     if (track) {
-      return fetchCaptionTrack(track);
+      try {
+        return await fetchCaptionTrack(track);
+      } catch (error) {
+        console.warn("Footnote caption endpoint failed; trying DOM transcript fallback.", error);
+      }
     }
 
     return getDomTranscript();
@@ -99,20 +103,37 @@
   }
 
   async function fetchCaptionTrack(track) {
-    const url = new URL(track.baseUrl);
-    url.searchParams.set("fmt", "json3");
+    const urls = [track.baseUrl, withFormat(track.baseUrl, "json3"), withFormat(track.baseUrl, "srv3")];
+    let lastError = null;
 
-    const response = await fetch(url.toString(), { credentials: "include" });
-    if (!response.ok) {
-      throw new Error("Transcript fetch was blocked or unavailable.");
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, { credentials: "include" });
+        if (!response.ok) {
+          throw new Error("Transcript fetch was blocked or unavailable.");
+        }
+
+        const text = await response.text();
+        if (!text.trim()) {
+          throw new Error("Transcript endpoint returned an empty response.");
+        }
+
+        if (text.trim().startsWith("{")) {
+          return parseJson3Transcript(JSON.parse(text));
+        }
+        return parseXmlTranscript(text);
+      } catch (error) {
+        lastError = error;
+      }
     }
 
-    const text = await response.text();
-    try {
-      return parseJson3Transcript(JSON.parse(text));
-    } catch {
-      return parseXmlTranscript(text);
-    }
+    throw lastError || new Error("Transcript fetch was blocked or unavailable.");
+  }
+
+  function withFormat(baseUrl, format) {
+    const url = new URL(baseUrl);
+    url.searchParams.set("fmt", format);
+    return url.toString();
   }
 
   function parseJson3Transcript(data) {
