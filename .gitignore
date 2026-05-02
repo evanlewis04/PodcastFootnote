@@ -1,0 +1,18 @@
+# Local environment and secrets
+.env
+.venv/
+venv/
+
+# Python/runtime artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Codex/PDF extraction scratch space
+.codex_temp_deps/
+extracted_pages/
+rendered_pages/
+
+# Future local app data
+data/cache/
+data/known_terms.json
