@@ -16,9 +16,12 @@
   let overlayVisible = false;
   let overlaySize = "small";
   let currentCards = [];
+  let sidebarPlacementTimer = 0;
 
   function boot() {
     startRouteWatcher();
+    installClickHandlers();
+    installDebugHooks();
     maybeLoadForCurrentPage();
   }
 
@@ -38,6 +41,58 @@
         }
       }, 1000);
     }
+  }
+
+  function installClickHandlers() {
+    document.addEventListener("click", (event) => {
+      const overlayToggle = event.target.closest && event.target.closest(".footnote-overlay-toggle");
+      if (overlayToggle) {
+        event.preventDefault();
+        overlayVisible = !overlayVisible;
+        syncOverlay();
+        return;
+      }
+
+      const overlayClose = event.target.closest && event.target.closest(".footnote-overlay-close");
+      if (overlayClose) {
+        event.preventDefault();
+        overlayVisible = false;
+        syncOverlay();
+        return;
+      }
+
+      const sizeButton = event.target.closest && event.target.closest(".footnote-size-button");
+      if (sizeButton) {
+        event.preventDefault();
+        resizeOverlay(sizeButton.dataset.sizeAction === "larger" ? 1 : -1);
+      }
+    });
+  }
+
+  function installDebugHooks() {
+    window.FootnoteDebug = {
+      showOverlay() {
+        overlayVisible = true;
+        syncOverlay();
+        return document.getElementById(OVERLAY_ID);
+      },
+      hideOverlay() {
+        overlayVisible = false;
+        syncOverlay();
+        return document.getElementById(OVERLAY_ID);
+      },
+      state() {
+        return {
+          currentVideoId,
+          cards: currentCards.length,
+          overlayVisible,
+          overlaySize,
+          sidebar: document.getElementById(ROOT_ID),
+          overlay: document.getElementById(OVERLAY_ID),
+          sidebarHost: getSidebarHost(),
+        };
+      },
+    };
   }
 
   async function maybeLoadForCurrentPage() {
@@ -107,6 +162,7 @@
       cleanupPlayback();
       cleanupPlayback = null;
     }
+    window.clearTimeout(sidebarPlacementTimer);
     const existingRoot = document.getElementById(ROOT_ID);
     if (existingRoot) existingRoot.remove();
     const overlayRoot = document.getElementById(OVERLAY_ID);
@@ -134,11 +190,6 @@
       <div class="footnote-card-list"></div>
     `;
 
-    root.querySelector(".footnote-overlay-toggle").addEventListener("click", () => {
-      overlayVisible = !overlayVisible;
-      syncOverlay(root);
-    });
-
     root.querySelector(".footnote-refresh").addEventListener("click", () => {
       const previousVideoId = currentVideoId;
       currentVideoId = "";
@@ -146,15 +197,25 @@
       currentVideoId = previousVideoId;
     });
 
+    placeSidebar(root);
+    return root;
+  }
+
+  function placeSidebar(root) {
     const host = getSidebarHost();
     if (host) {
+      root.classList.remove("is-floating", "is-pending-placement");
       host.prepend(root);
-    } else {
-      document.body.append(root);
-      root.classList.add("is-floating");
+      return;
     }
 
-    return root;
+    root.classList.add("is-pending-placement");
+    window.clearTimeout(sidebarPlacementTimer);
+    sidebarPlacementTimer = window.setTimeout(() => {
+      if (document.getElementById(ROOT_ID) === root || !root.isConnected) {
+        placeSidebar(root);
+      }
+    }, 250);
   }
 
   function renderState(root, type, message) {
@@ -233,6 +294,9 @@
 
     const overlayRoot = ensureOverlay();
     applyOverlayBaseStyles(overlayRoot);
+    if (!overlayRoot.isConnected) {
+      document.body.append(overlayRoot);
+    }
     overlayRoot.dataset.state = sidebarRoot ? sidebarRoot.dataset.state || "ready" : "ready";
     overlayRoot.dataset.overlaySize = overlaySize;
     overlayRoot.querySelector(".footnote-status").textContent = sidebarRoot
@@ -275,17 +339,7 @@
       <div class="footnote-card-list"></div>
     `;
 
-    overlayRoot.querySelector('[data-size-action="smaller"]').addEventListener("click", () => {
-      resizeOverlay(-1);
-    });
-    overlayRoot.querySelector('[data-size-action="larger"]').addEventListener("click", () => {
-      resizeOverlay(1);
-    });
-    overlayRoot.querySelector(".footnote-overlay-close").addEventListener("click", () => {
-      overlayVisible = false;
-      syncOverlay();
-    });
-
+    document.body.append(overlayRoot);
     return overlayRoot;
   }
 
@@ -304,7 +358,7 @@
     } else {
       overlayRoot.classList.remove("is-fullscreen");
       positionOverlayOverVideo(overlayRoot);
-      document.documentElement.append(overlayRoot);
+      document.body.append(overlayRoot);
     }
   }
 
