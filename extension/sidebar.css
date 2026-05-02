@@ -28,29 +28,35 @@
 }
 
 .footnote-root.is-overlay {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  position: fixed;
+  top: var(--footnote-overlay-top, 96px);
+  right: var(--footnote-overlay-right, 16px);
   z-index: 2147483647;
   width: min(300px, 26vw);
-  max-height: min(48vh, calc(100% - 32px));
+  max-height: min(48vh, calc(100vh - 32px));
   margin: 0;
   box-shadow: 0 16px 48px rgba(6, 10, 18, 0.34);
 }
 
+.footnote-root.is-overlay.is-fullscreen {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+
 .footnote-root.is-overlay[data-overlay-size="small"] {
   width: min(260px, 24vw);
-  max-height: min(40vh, calc(100% - 32px));
+  max-height: min(40vh, calc(100vh - 32px));
 }
 
 .footnote-root.is-overlay[data-overlay-size="medium"] {
   width: min(340px, 30vw);
-  max-height: min(56vh, calc(100% - 32px));
+  max-height: min(56vh, calc(100vh - 32px));
 }
 
 .footnote-root.is-overlay[data-overlay-size="large"] {
   width: min(430px, 36vw);
-  max-height: min(72vh, calc(100% - 32px));
+  max-height: min(72vh, calc(100vh - 32px));
 }
 
 :fullscreen .footnote-root.is-overlay,
@@ -135,6 +141,12 @@
 .footnote-size-button:hover,
 .footnote-dismiss:hover {
   background: #eef3fb;
+}
+
+.footnote-overlay-toggle.is-active {
+  border-color: #2f6fed;
+  background: #eef4ff;
+  color: #174fb8;
 }
 
 .footnote-size-button {

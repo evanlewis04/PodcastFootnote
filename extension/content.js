@@ -21,6 +21,8 @@
     document.addEventListener("yt-navigate-finish", maybeLoadForCurrentPage);
     document.addEventListener("fullscreenchange", updateOverlayPlacement);
     document.addEventListener("webkitfullscreenchange", updateOverlayPlacement);
+    window.addEventListener("resize", updateOverlayPlacement);
+    window.addEventListener("scroll", updateOverlayPlacement, { passive: true });
 
     if (!routePoller) {
       let lastUrl = location.href;
@@ -284,13 +286,51 @@
     const overlayRoot = document.getElementById(OVERLAY_ID);
     if (!overlayRoot || !overlayVisible) return;
 
-    const host = getOverlayHost();
-    if (host) {
-      host.append(overlayRoot);
+    overlayRoot.classList.remove("is-floating");
+    const fullscreenHost = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fullscreenHost) {
+      overlayRoot.classList.add("is-fullscreen");
+      overlayRoot.style.removeProperty("--footnote-overlay-top");
+      overlayRoot.style.removeProperty("--footnote-overlay-right");
+      fullscreenHost.append(overlayRoot);
     } else {
+      overlayRoot.classList.remove("is-fullscreen");
+      positionOverlayOverVideo(overlayRoot);
       document.body.append(overlayRoot);
-      overlayRoot.classList.add("is-floating");
     }
+  }
+
+  function positionOverlayOverVideo(overlayRoot) {
+    const videoBox = getVideoBox();
+    if (!videoBox) {
+      overlayRoot.style.setProperty("--footnote-overlay-top", "96px");
+      overlayRoot.style.setProperty("--footnote-overlay-right", "16px");
+      return;
+    }
+
+    const top = Math.max(videoBox.top + 16, 16);
+    const right = Math.max(window.innerWidth - videoBox.right + 16, 16);
+    overlayRoot.style.setProperty("--footnote-overlay-top", `${Math.round(top)}px`);
+    overlayRoot.style.setProperty("--footnote-overlay-right", `${Math.round(right)}px`);
+  }
+
+  function getVideoBox() {
+    const candidates = [
+      document.querySelector("#player"),
+      document.querySelector("#movie_player"),
+      document.querySelector(".html5-video-player"),
+      document.querySelector("video"),
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const box = candidate.getBoundingClientRect();
+      if (box.width > 100 && box.height > 100) {
+        return box;
+      }
+    }
+
+    return null;
   }
 
   function removeOverlay() {
@@ -317,20 +357,11 @@
     if (!button) return;
     button.textContent = overlayVisible ? "Hide overlay" : "Overlay";
     button.title = overlayVisible ? "Hide Footnote over the video" : "Show Footnote over the video";
+    button.classList.toggle("is-active", overlayVisible);
   }
 
   function getSidebarHost() {
     return document.querySelector("#secondary-inner") || document.querySelector("#secondary");
-  }
-
-  function getOverlayHost() {
-    return (
-      document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.querySelector("#movie_player") ||
-      document.querySelector(".html5-video-player") ||
-      document.querySelector("#player")
-    );
   }
 
   function sortCards(cards) {
