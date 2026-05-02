@@ -6,6 +6,7 @@
   let currentVideoId = "";
   let cleanupPlayback = null;
   let routePoller = null;
+  let displayMode = "sidebar";
 
   function boot() {
     startRouteWatcher();
@@ -14,6 +15,8 @@
 
   function startRouteWatcher() {
     document.addEventListener("yt-navigate-finish", maybeLoadForCurrentPage);
+    document.addEventListener("fullscreenchange", handleDisplayEnvironmentChange);
+    document.addEventListener("webkitfullscreenchange", handleDisplayEnvironmentChange);
 
     if (!routePoller) {
       let lastUrl = location.href;
@@ -39,7 +42,7 @@
 
     currentVideoId = videoId;
     teardown(false);
-    const root = injectSidebar();
+    const root = injectPanel();
     renderState(root, "loading", "Collecting transcript...");
 
     try {
@@ -75,6 +78,13 @@
     }
   }
 
+  function handleDisplayEnvironmentChange() {
+    const root = document.getElementById(ROOT_ID);
+    if (root) {
+      updateRootPlacement(root);
+    }
+  }
+
   async function loadCachedResponse(videoId, knownTerms, originalError) {
     try {
       return await window.FootnoteApi.getCachedTerms(videoId);
@@ -98,7 +108,7 @@
     if (resetVideoId) currentVideoId = "";
   }
 
-  function injectSidebar() {
+  function injectPanel() {
     const root = document.createElement("aside");
     root.id = ROOT_ID;
     root.className = "footnote-root";
@@ -108,11 +118,19 @@
           <div class="footnote-title">Footnote</div>
           <div class="footnote-subtitle">Glossary cards</div>
         </div>
-        <button class="footnote-refresh" type="button" title="Refresh Footnote">Refresh</button>
+        <div class="footnote-actions">
+          <button class="footnote-mode-toggle" type="button" title="Move Footnote into the video">Overlay</button>
+          <button class="footnote-refresh" type="button" title="Refresh Footnote">Refresh</button>
+        </div>
       </div>
       <div class="footnote-status" role="status"></div>
       <div class="footnote-card-list"></div>
     `;
+
+    root.querySelector(".footnote-mode-toggle").addEventListener("click", () => {
+      displayMode = displayMode === "overlay" ? "sidebar" : "overlay";
+      updateRootPlacement(root);
+    });
 
     root.querySelector(".footnote-refresh").addEventListener("click", () => {
       const previousVideoId = currentVideoId;
@@ -121,15 +139,57 @@
       currentVideoId = previousVideoId;
     });
 
-    const secondary = document.querySelector("#secondary-inner") || document.querySelector("#secondary");
-    if (secondary) {
-      secondary.prepend(root);
+    updateRootPlacement(root);
+    return root;
+  }
+
+  function updateRootPlacement(root) {
+    const effectiveMode = isFullscreen() ? "overlay" : displayMode;
+    root.classList.toggle("is-overlay", effectiveMode === "overlay");
+    root.classList.toggle("is-sidebar", effectiveMode === "sidebar");
+    root.classList.remove("is-floating");
+    root.dataset.displayMode = effectiveMode;
+
+    const host = effectiveMode === "overlay" ? getOverlayHost() : getSidebarHost();
+    if (host) {
+      host.prepend(root);
     } else {
       document.body.append(root);
       root.classList.add("is-floating");
     }
 
-    return root;
+    updateModeButton(root);
+  }
+
+  function updateModeButton(root) {
+    const button = root.querySelector(".footnote-mode-toggle");
+    if (!button) return;
+
+    if (displayMode === "overlay") {
+      button.textContent = "Sidebar";
+      button.title = "Move Footnote back to YouTube's sidebar";
+    } else {
+      button.textContent = "Overlay";
+      button.title = "Move Footnote into the video";
+    }
+  }
+
+  function getSidebarHost() {
+    return document.querySelector("#secondary-inner") || document.querySelector("#secondary");
+  }
+
+  function getOverlayHost() {
+    return (
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.querySelector("#movie_player") ||
+      document.querySelector(".html5-video-player") ||
+      document.querySelector("#player")
+    );
+  }
+
+  function isFullscreen() {
+    return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
   }
 
   function renderState(root, type, message) {
