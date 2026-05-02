@@ -5,9 +5,9 @@
     "Technically curious generalist. Comfortable with common software, internet, and high-school science vocabulary.";
   const OVERLAY_SIZES = ["small", "medium", "large"];
   const OVERLAY_DIMENSIONS = {
-    small: { width: 280, heightRatio: 0.4 },
-    medium: { width: 360, heightRatio: 0.56 },
-    large: { width: 460, heightRatio: 0.72 },
+    small: { width: 280, pageRatio: 0.4, fullscreenRatio: 0.24 },
+    medium: { width: 360, pageRatio: 0.56, fullscreenRatio: 0.44 },
+    large: { width: 460, pageRatio: 0.72, fullscreenRatio: 0.66 },
   };
 
   let currentVideoId = "";
@@ -353,7 +353,7 @@
     if (fullscreenHost) {
       overlayRoot.classList.add("is-fullscreen");
       overlayRoot.style.position = "absolute";
-      positionOverlayInRect(overlayRoot, fullscreenHost.getBoundingClientRect(), true);
+      positionOverlayInFullscreen(overlayRoot);
       fullscreenHost.append(overlayRoot);
     } else {
       overlayRoot.classList.remove("is-fullscreen");
@@ -373,15 +373,16 @@
   }
 
   function positionOverlayInViewport(overlayRoot) {
-    const dimensions = getOverlayDimensions(window.innerWidth, window.innerHeight);
+    const dimensions = getOverlayDimensions(window.innerWidth, window.innerHeight, false);
     overlayRoot.style.top = "96px";
     overlayRoot.style.left = `${Math.max(window.innerWidth - dimensions.width - 24, 16)}px`;
     overlayRoot.style.width = `${dimensions.width}px`;
+    overlayRoot.style.height = `${dimensions.height}px`;
     overlayRoot.style.maxHeight = `${dimensions.height}px`;
   }
 
   function positionOverlayInRect(overlayRoot, rect, fullscreen) {
-    const dimensions = getOverlayDimensions(rect.width, rect.height);
+    const dimensions = getOverlayDimensions(rect.width, rect.height, fullscreen);
     const inset = fullscreen ? 28 : 18;
     const top = Math.max(rect.top + inset, inset);
     const left = Math.max(rect.right - dimensions.width - inset, inset);
@@ -389,13 +390,28 @@
     overlayRoot.style.left = `${Math.round(left)}px`;
     overlayRoot.style.right = "auto";
     overlayRoot.style.width = `${dimensions.width}px`;
+    overlayRoot.style.height = `${dimensions.height}px`;
     overlayRoot.style.maxHeight = `${dimensions.height}px`;
   }
 
-  function getOverlayDimensions(containerWidth, containerHeight) {
+  function positionOverlayInFullscreen(overlayRoot) {
+    const dimensions = getOverlayDimensions(window.innerWidth, window.innerHeight, true);
+    const inset = 28;
+    overlayRoot.style.top = `${inset}px`;
+    overlayRoot.style.left = `${Math.max(window.innerWidth - dimensions.width - inset, inset)}px`;
+    overlayRoot.style.right = "auto";
+    overlayRoot.style.width = `${dimensions.width}px`;
+    overlayRoot.style.height = `${dimensions.height}px`;
+    overlayRoot.style.maxHeight = `${dimensions.height}px`;
+  }
+
+  function getOverlayDimensions(containerWidth, containerHeight, fullscreen) {
     const size = OVERLAY_DIMENSIONS[overlaySize] || OVERLAY_DIMENSIONS.small;
     const width = Math.min(size.width, Math.max(containerWidth * 0.38, 240), window.innerWidth - 32);
-    const height = Math.min(Math.max(containerHeight * size.heightRatio, 180), window.innerHeight - 120);
+    const ratio = fullscreen ? size.fullscreenRatio : size.pageRatio;
+    const minHeight = fullscreen ? 150 : 180;
+    const maxHeight = fullscreen ? window.innerHeight - 140 : window.innerHeight - 120;
+    const height = Math.min(Math.max(containerHeight * ratio, minHeight), maxHeight);
     return { width: Math.round(width), height: Math.round(height) };
   }
 
@@ -407,6 +423,7 @@
     overlayRoot.style.position = "fixed";
     overlayRoot.style.zIndex = "2147483647";
     overlayRoot.style.margin = "0";
+    overlayRoot.style.overflow = "hidden";
   }
 
   function getVideoBox() {
