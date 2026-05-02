@@ -28,6 +28,24 @@ def test_cors_allows_youtube_origin():
     assert response.headers["access-control-allow-origin"] == "https://www.youtube.com"
 
 
+def test_read_cache_returns_cached_response(monkeypatch):
+    cached_response = ExtractResponse(video_id="abc123", cached=True, terms=[])
+    monkeypatch.setattr(app_module, "get_cache", lambda video_id: cached_response)
+
+    response = client.get("/cache/abc123")
+
+    assert response.status_code == 200
+    assert response.json()["cached"] is True
+
+
+def test_read_cache_returns_404_for_cache_miss(monkeypatch):
+    monkeypatch.setattr(app_module, "get_cache", lambda video_id: None)
+
+    response = client.get("/cache/abc123")
+
+    assert response.status_code == 404
+
+
 def test_extract_returns_cached_response(monkeypatch):
     cached_response = ExtractResponse(
         video_id="abc123",

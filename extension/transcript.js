@@ -14,7 +14,11 @@
       throw new Error("No YouTube video ID found.");
     }
 
-    const track = findCaptionTrack();
+    let track = findCaptionTrack();
+    if (!track) {
+      track = await findCaptionTrackFromFreshPage(videoId);
+    }
+
     if (track) {
       try {
         return await fetchCaptionTrack(track);
@@ -66,6 +70,56 @@
       }
     }
     return null;
+  }
+
+  async function findCaptionTrackFromFreshPage(videoId) {
+    try {
+      const response = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
+        credentials: "include",
+      });
+      if (!response.ok) return null;
+      const pageText = await response.text();
+      return findCaptionTrackInText(pageText);
+    } catch {
+      return null;
+    }
+  }
+
+  function findCaptionTrackInText(text) {
+    const marker = "ytInitialPlayerResponse";
+    const markerIndex = text.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const firstBrace = text.indexOf("{", markerIndex);
+    if (firstBrace === -1) return null;
+
+    const jsonText = extractBalancedJson(text, firstBrace);
+    if (!jsonText) return null;
+
+    try {
+      return pickCaptionTrack(JSON.parse(jsonText));
+    } catch {
+      return null;
+    }
+  }
+
+  function pickCaptionTrack(response) {
+    const tracks =
+      response &&
+      response.captions &&
+      response.captions.playerCaptionsTracklistRenderer &&
+      response.captions.playerCaptionsTracklistRenderer.captionTracks;
+
+    if (!Array.isArray(tracks) || tracks.length === 0) {
+      return null;
+    }
+
+    return (
+      tracks.find((track) => track.languageCode && track.languageCode.startsWith("en") && track.kind !== "asr") ||
+      tracks.find((track) => track.languageCode && track.languageCode.startsWith("en")) ||
+      tracks.find((track) => track.kind !== "asr") ||
+      tracks[0]
+    );
   }
 
   function extractBalancedJson(text, startIndex) {

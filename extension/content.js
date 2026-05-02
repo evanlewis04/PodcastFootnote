@@ -44,7 +44,20 @@
 
     try {
       const knownTerms = await window.FootnoteStorage.loadKnownTerms();
-      const transcript = await window.FootnoteTranscript.getTranscript();
+      let transcript = null;
+      try {
+        transcript = await window.FootnoteTranscript.getTranscript();
+      } catch (transcriptError) {
+        renderState(root, "loading", "Transcript unavailable; checking cache...");
+        const cachedResponse = await loadCachedResponse(videoId, knownTerms, transcriptError);
+        if (cachedResponse) {
+          const visibleTerms = filterKnownTerms(cachedResponse.terms || [], knownTerms);
+          renderCards(root, visibleTerms, true);
+          return;
+        }
+        throw transcriptError;
+      }
+
       renderState(root, "loading", "Extracting glossary cards...");
       const response = await window.FootnoteApi.extractTerms({
         video_id: videoId,
@@ -59,6 +72,19 @@
       renderCards(root, visibleTerms, Boolean(response.cached));
     } catch (error) {
       renderState(root, "error", error && error.message ? error.message : "Footnote could not load this video.");
+    }
+  }
+
+  async function loadCachedResponse(videoId, knownTerms, originalError) {
+    try {
+      return await window.FootnoteApi.getCachedTerms(videoId);
+    } catch (cacheError) {
+      console.warn("Footnote cache lookup failed after transcript error.", {
+        transcriptError: originalError,
+        cacheError,
+        knownTerms,
+      });
+      return null;
     }
   }
 

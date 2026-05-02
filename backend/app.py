@@ -24,6 +24,19 @@ def health() -> dict[str, bool]:
     return {"ok": True}
 
 
+@app.get("/cache/{video_id}", response_model=ExtractResponse)
+def read_cache(video_id: str) -> ExtractResponse:
+    try:
+        cached_response = get_cache(video_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    if cached_response is None:
+        raise HTTPException(status_code=404, detail="No cached extraction found for this video_id.")
+
+    return cached_response
+
+
 @app.post("/extract", response_model=ExtractResponse)
 def extract(request: ExtractRequest) -> ExtractResponse:
     cached_response = get_cache(request.video_id)

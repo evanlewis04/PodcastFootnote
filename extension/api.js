@@ -23,7 +23,25 @@
     return data;
   }
 
+  async function getCachedTerms(videoId) {
+    const response = await fetch(`${API_BASE_URL}/cache/${encodeURIComponent(videoId)}`);
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const detail = data && data.detail ? data.detail : `Request failed with ${response.status}`;
+      throw new Error(detail);
+    }
+
+    return data;
+  }
+
   window.FootnoteApi = {
     extractTerms,
+    getCachedTerms,
   };
 })();
