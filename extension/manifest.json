@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Footnote",
+  "description": "Local timestamp-synced glossary cards for YouTube videos.",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/watch*"],
+      "js": ["storage.js", "api.js", "transcript.js", "playback.js", "content.js"],
+      "css": ["sidebar.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "http://localhost:8000/*"
+  ]
+}

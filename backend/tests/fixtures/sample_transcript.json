@@ -1,0 +1,27 @@
+[
+  {
+    "start": 0.0,
+    "duration": 4.5,
+    "text": "Today we are talking about fine tuning language models without retraining every parameter."
+  },
+  {
+    "start": 65.2,
+    "duration": 5.1,
+    "text": "A common approach is LoRA, which stands for Low-Rank Adaptation, and it inserts small trainable matrices into the model."
+  },
+  {
+    "start": 185.0,
+    "duration": 4.8,
+    "text": "The optimizer still uses backpropagation, but the memory footprint is much smaller."
+  },
+  {
+    "start": 342.3,
+    "duration": 6.2,
+    "text": "Later, the team compares retrieval augmented generation with standard supervised fine tuning."
+  },
+  {
+    "start": 608.9,
+    "duration": 5.5,
+    "text": "They also discuss quantization and how lower precision weights can make inference cheaper."
+  }
+]
