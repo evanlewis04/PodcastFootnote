@@ -42,6 +42,15 @@
         element.classList.toggle("is-active", element.dataset.cardId === activeId);
       });
 
+      window.dispatchEvent(
+        new CustomEvent("footnote-active-card-changed", {
+          detail: {
+            activeId,
+            currentTime,
+          },
+        })
+      );
+
       if (!userScrolling && activeId) {
         const activeElement = root.querySelector(`.footnote-card[data-card-id="${cssEscape(activeId)}"]`);
         if (activeElement) {

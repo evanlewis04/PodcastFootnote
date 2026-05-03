@@ -21,6 +21,7 @@
   function boot() {
     startRouteWatcher();
     installClickHandlers();
+    installPlaybackMirror();
     installDebugHooks();
     maybeLoadForCurrentPage();
   }
@@ -69,6 +70,12 @@
     });
   }
 
+  function installPlaybackMirror() {
+    window.addEventListener("footnote-active-card-changed", (event) => {
+      updateOverlayActiveCard(event.detail && event.detail.activeId ? event.detail.activeId : "");
+    });
+  }
+
   function installDebugHooks() {
     window.FootnoteDebug = {
       showOverlay() {
@@ -87,6 +94,7 @@
           cards: currentCards.length,
           overlayVisible,
           overlaySize,
+          activeCardId: getActiveCardId(),
           sidebar: document.getElementById(ROOT_ID),
           overlay: document.getElementById(OVERLAY_ID),
           sidebarHost: getSidebarHost(),
@@ -308,11 +316,12 @@
     for (const card of currentCards) {
       const sidebarCard = sidebarRoot ? sidebarRoot.querySelector(`.footnote-card[data-card-id="${cssEscape(card.id)}"]`) : null;
       const cardElement = createCard(card, { readOnly: true });
-      cardElement.classList.toggle("is-active", Boolean(sidebarCard && sidebarCard.classList.contains("is-active")));
+      cardElement.classList.toggle("is-active", card.id === getActiveCardId(sidebarRoot, sidebarCard));
       list.append(cardElement);
     }
 
     updateOverlayPlacement();
+    scrollOverlayToActiveCard();
   }
 
   function ensureOverlay() {
@@ -450,6 +459,27 @@
     if (overlayRoot) overlayRoot.remove();
   }
 
+  function updateOverlayActiveCard(activeId) {
+    const overlayRoot = document.getElementById(OVERLAY_ID);
+    if (!overlayRoot || !overlayVisible) return;
+
+    overlayRoot.querySelectorAll(".footnote-card").forEach((element) => {
+      element.classList.toggle("is-active", element.dataset.cardId === activeId);
+    });
+
+    scrollOverlayToActiveCard();
+  }
+
+  function scrollOverlayToActiveCard() {
+    const overlayRoot = document.getElementById(OVERLAY_ID);
+    if (!overlayRoot || !overlayVisible) return;
+
+    const activeCard = overlayRoot.querySelector(".footnote-card.is-active");
+    if (activeCard) {
+      activeCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+
   function resizeOverlay(direction) {
     const currentIndex = OVERLAY_SIZES.indexOf(overlaySize);
     const nextIndex = Math.min(Math.max(currentIndex + direction, 0), OVERLAY_SIZES.length - 1);
@@ -470,6 +500,15 @@
     button.textContent = overlayVisible ? "Hide overlay" : "Overlay";
     button.title = overlayVisible ? "Hide Footnote over the video" : "Show Footnote over the video";
     button.classList.toggle("is-active", overlayVisible);
+  }
+
+  function getActiveCardId(sidebarRoot = document.getElementById(ROOT_ID), knownSidebarCard = null) {
+    if (knownSidebarCard && knownSidebarCard.classList.contains("is-active")) {
+      return knownSidebarCard.dataset.cardId || "";
+    }
+
+    const activeCard = sidebarRoot ? sidebarRoot.querySelector(".footnote-card.is-active") : null;
+    return activeCard ? activeCard.dataset.cardId || "" : "";
   }
 
   function getSidebarHost() {
