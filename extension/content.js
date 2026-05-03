@@ -4,6 +4,7 @@
   const DEFAULT_LISTENER_PROFILE =
     "Technically curious generalist. Comfortable with common software, internet, and high-school science vocabulary.";
   const OVERLAY_SIZES = ["small", "medium", "large"];
+  const OVERLAY_CORNERS = ["top-right", "bottom-right", "bottom-left", "top-left"];
   const OVERLAY_DIMENSIONS = {
     small: { width: 280, pageRatio: 0.4, fullscreenRatio: 0.24 },
     medium: { width: 360, pageRatio: 0.56, fullscreenRatio: 0.44 },
@@ -15,6 +16,7 @@
   let routePoller = null;
   let overlayVisible = false;
   let overlaySize = "small";
+  let overlayCorner = "top-right";
   let currentCards = [];
   let sidebarPlacementTimer = 0;
 
@@ -66,6 +68,20 @@
       if (sizeButton) {
         event.preventDefault();
         resizeOverlay(sizeButton.dataset.sizeAction === "larger" ? 1 : -1);
+        return;
+      }
+
+      const cornerButton = event.target.closest && event.target.closest(".footnote-corner-button");
+      if (cornerButton) {
+        event.preventDefault();
+        moveOverlayCorner();
+        return;
+      }
+
+      const currentButton = event.target.closest && event.target.closest(".footnote-current-button");
+      if (currentButton) {
+        event.preventDefault();
+        jumpToCurrentCard();
       }
     });
   }
@@ -94,6 +110,7 @@
           cards: currentCards.length,
           overlayVisible,
           overlaySize,
+          overlayCorner,
           activeCardId: getActiveCardId(),
           sidebar: document.getElementById(ROOT_ID),
           overlay: document.getElementById(OVERLAY_ID),
@@ -191,6 +208,7 @@
         </div>
         <div class="footnote-actions">
           <button class="footnote-overlay-toggle" type="button" title="Show Footnote over the video">Overlay</button>
+          <button class="footnote-current-button" type="button" title="Jump to the current glossary card">Current</button>
           <button class="footnote-refresh" type="button" title="Refresh Footnote">Refresh</button>
         </div>
       </div>
@@ -307,6 +325,7 @@
     }
     overlayRoot.dataset.state = sidebarRoot ? sidebarRoot.dataset.state || "ready" : "ready";
     overlayRoot.dataset.overlaySize = overlaySize;
+    overlayRoot.dataset.overlayCorner = overlayCorner;
     overlayRoot.querySelector(".footnote-status").textContent = sidebarRoot
       ? sidebarRoot.querySelector(".footnote-status").textContent
       : "";
@@ -341,6 +360,8 @@
         <div class="footnote-actions">
           <button class="footnote-size-button" data-size-action="smaller" type="button" title="Make overlay smaller">-</button>
           <button class="footnote-size-button" data-size-action="larger" type="button" title="Make overlay larger">+</button>
+          <button class="footnote-corner-button" type="button" title="Move overlay to another corner">Corner</button>
+          <button class="footnote-current-button" type="button" title="Jump to the current glossary card">Current</button>
           <button class="footnote-overlay-close" type="button" title="Hide video overlay">Hide</button>
         </div>
       </div>
@@ -383,8 +404,17 @@
 
   function positionOverlayInViewport(overlayRoot) {
     const dimensions = getOverlayDimensions(window.innerWidth, window.innerHeight, false);
-    overlayRoot.style.top = "96px";
-    overlayRoot.style.left = `${Math.max(window.innerWidth - dimensions.width - 24, 16)}px`;
+    const rect = {
+      top: 80,
+      right: window.innerWidth - 16,
+      bottom: window.innerHeight - 24,
+      left: 16,
+      width: window.innerWidth - 32,
+      height: window.innerHeight - 104,
+    };
+    const point = getCornerPosition(rect, dimensions, 16);
+    overlayRoot.style.top = `${point.top}px`;
+    overlayRoot.style.left = `${point.left}px`;
     overlayRoot.style.width = `${dimensions.width}px`;
     overlayRoot.style.height = `${dimensions.height}px`;
     overlayRoot.style.maxHeight = `${dimensions.height}px`;
@@ -393,8 +423,9 @@
   function positionOverlayInRect(overlayRoot, rect, fullscreen) {
     const dimensions = getOverlayDimensions(rect.width, rect.height, fullscreen);
     const inset = fullscreen ? 28 : 18;
-    const top = Math.max(rect.top + inset, inset);
-    const left = Math.max(rect.right - dimensions.width - inset, inset);
+    const point = getCornerPosition(rect, dimensions, inset);
+    const top = Math.max(point.top, inset);
+    const left = Math.max(point.left, inset);
     overlayRoot.style.top = `${Math.round(top)}px`;
     overlayRoot.style.left = `${Math.round(left)}px`;
     overlayRoot.style.right = "auto";
@@ -406,8 +437,17 @@
   function positionOverlayInFullscreen(overlayRoot) {
     const dimensions = getOverlayDimensions(window.innerWidth, window.innerHeight, true);
     const inset = 28;
-    overlayRoot.style.top = `${inset}px`;
-    overlayRoot.style.left = `${Math.max(window.innerWidth - dimensions.width - inset, inset)}px`;
+    const rect = {
+      top: 0,
+      right: window.innerWidth,
+      bottom: window.innerHeight,
+      left: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+    const point = getCornerPosition(rect, dimensions, inset);
+    overlayRoot.style.top = `${point.top}px`;
+    overlayRoot.style.left = `${point.left}px`;
     overlayRoot.style.right = "auto";
     overlayRoot.style.width = `${dimensions.width}px`;
     overlayRoot.style.height = `${dimensions.height}px`;
@@ -422,6 +462,25 @@
     const maxHeight = fullscreen ? window.innerHeight - 140 : window.innerHeight - 120;
     const height = Math.min(Math.max(containerHeight * ratio, minHeight), maxHeight);
     return { width: Math.round(width), height: Math.round(height) };
+  }
+
+  function getCornerPosition(rect, dimensions, inset) {
+    const top = rect.top + inset;
+    const bottom = rect.bottom - dimensions.height - inset;
+    const left = rect.left + inset;
+    const right = rect.right - dimensions.width - inset;
+
+    switch (overlayCorner) {
+      case "top-left":
+        return { top, left };
+      case "bottom-left":
+        return { top: Math.max(bottom, inset), left };
+      case "bottom-right":
+        return { top: Math.max(bottom, inset), left: Math.max(right, inset) };
+      case "top-right":
+      default:
+        return { top, left: Math.max(right, inset) };
+    }
   }
 
   function applyOverlayBaseStyles(overlayRoot) {
@@ -485,6 +544,30 @@
     const nextIndex = Math.min(Math.max(currentIndex + direction, 0), OVERLAY_SIZES.length - 1);
     overlaySize = OVERLAY_SIZES[nextIndex];
     syncOverlay();
+  }
+
+  function moveOverlayCorner() {
+    const currentIndex = OVERLAY_CORNERS.indexOf(overlayCorner);
+    overlayCorner = OVERLAY_CORNERS[(currentIndex + 1) % OVERLAY_CORNERS.length];
+    syncOverlay();
+  }
+
+  function jumpToCurrentCard() {
+    const sidebarRoot = document.getElementById(ROOT_ID);
+    const activeId = getActiveCardId(sidebarRoot);
+    if (!activeId) return;
+
+    scrollCardIntoView(sidebarRoot, activeId);
+    const overlayRoot = document.getElementById(OVERLAY_ID);
+    scrollCardIntoView(overlayRoot, activeId);
+  }
+
+  function scrollCardIntoView(root, cardId) {
+    if (!root) return;
+    const card = root.querySelector(`.footnote-card[data-card-id="${cssEscape(cardId)}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
 
   function removeCard(cardId) {
