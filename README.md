@@ -1,6 +1,50 @@
 # Footnote
 
-Footnote is a local MVP for timestamp-synced glossary cards on YouTube videos. This first implementation includes the FastAPI backend skeleton, local JSON storage, and a loadable Chrome extension shell.
+Footnote is a workflow-native AI comprehension layer for technical long-form video. It extracts high-signal concepts from YouTube transcripts, resolves them to playback timestamps, and renders personalized glossary cards directly inside the watching experience.
+
+The project is intentionally framed as an applied AI system rather than a generic chatbot: transcript ingestion, structured LLM extraction, schema validation, deterministic post-processing, cache-first storage, playback-synced UX, known-term personalization, and evaluation tooling all work together to make fragmented knowledge operational.
+
+## Why This Exists
+
+Technical podcasts, lectures, and demo videos contain dense institutional knowledge, but the knowledge is trapped in a linear media format. Footnote explores how an AI system can turn that unstructured stream into just-in-time context without forcing the user to pause, search, or switch into a chat workflow.
+
+This makes the repo a small but concrete example of the broader direction behind many practical AI products: retrieval quality, context engineering, workflow integration, and useful automation around messy source material.
+
+## Current Capabilities
+
+- Chrome extension for YouTube watch pages.
+- Transcript collection from the active video.
+- Local FastAPI backend for extraction and cache lookup.
+- Structured OpenAI extraction prompt with strict JSON validation.
+- Deduplication and quote-based timestamp resolution.
+- Cache-first responses stored under `data/cache/{video_id}.json`.
+- Extraction-run metadata for prompt version, model, latency, transcript size, term count, timestamp coverage, and low-confidence rate.
+- Known-term dismissal so familiar concepts stay hidden.
+- Sidebar and video overlay UI with playback-synced active-card highlighting.
+- Manual and fixture-based evaluation for precision, recall, F1, timestamp coverage, and low-confidence rate.
+
+## Architecture
+
+```mermaid
+flowchart TD
+  A["YouTube watch page"] --> B["Chrome extension"]
+  B --> C["Transcript collector"]
+  C --> D["POST /extract"]
+  D --> E{"Cache hit?"}
+  E -->|Yes| F["Return validated cards"]
+  E -->|No| G["Build extraction prompt"]
+  G --> H["OpenAI Responses API"]
+  H --> I["Validate JSON schema"]
+  I --> J["Deduplicate terms"]
+  J --> K["Resolve timestamps from quotes"]
+  K --> L["Write cache"]
+  L --> F
+  F --> M["Sidebar and overlay"]
+  N["Playback currentTime"] --> O["Highlight active card"]
+  M --> O
+```
+
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## Local Backend Setup
 
@@ -50,6 +94,20 @@ The extension injects a Footnote sidebar on YouTube watch pages. It collects cap
 pytest
 ```
 
+## Run An Evaluation Fixture
+
+Footnote includes a small extraction-quality harness. It compares a cached or fixture response against a human-labeled expected term set.
+
+```powershell
+python -m backend.evaluation backend\tests\fixtures\evaluation_case.json backend\tests\fixtures\sample_extract_response.json
+```
+
+The report includes precision, recall, F1, timestamp coverage, low-confidence rate, matched terms, and false positives.
+
+Evaluation details: [docs/EVALUATION.md](docs/EVALUATION.md)
+
+Example response and report: [docs/EXAMPLE_OUTPUT.md](docs/EXAMPLE_OUTPUT.md)
+
 ## Render the Offline Extraction Prompt
 
 Phase 2 includes a prompt-only harness for validating prompt shape against a saved transcript fixture. This does not call the OpenAI API.
@@ -79,3 +137,19 @@ Invoke-RestMethod http://localhost:8000/extract -Method Post -ContentType "appli
 ## MVP Testing Loop
 
 Use [docs\TESTING_CHECKLIST.md](docs/TESTING_CHECKLIST.md) to evaluate real videos for precision, recall, definition quality, sync quality, cache behavior, and known-term dismissal.
+
+## Portfolio Framing
+
+Footnote is meant to signal product-minded applied AI engineering: taking messy transcript data, extracting structured knowledge, validating model behavior, and embedding the result in a real user workflow.
+
+See [docs/PORTFOLIO_POSITIONING.md](docs/PORTFOLIO_POSITIONING.md) for resume-ready framing, stronger project descriptions, and upgrade themes.
+
+For the final visual polish pass, use [docs/DEMO_CHECKLIST.md](docs/DEMO_CHECKLIST.md) to capture the screenshots/GIFs that should be added once the extension is running against a real video.
+
+## Roadmap
+
+- Move local JSON storage to SQLite for queryable videos, transcripts, terms, known terms, and eval runs.
+- Add async extraction jobs for longer transcripts.
+- Expand the labeled evaluation set across AI research, finance, science, and business videos.
+- Add domain profiles that tune density, categories, and listener assumptions.
+- Add a source-backed concept memory so recurring terms receive consistent explanations across videos.

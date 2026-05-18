@@ -1,0 +1,20 @@
+{
+  "video_id": "sample-ai-video",
+  "notes": "Small labeled set for the local sample transcript.",
+  "expected_terms": [
+    {
+      "term": "LoRA",
+      "aliases": ["Low-Rank Adaptation"],
+      "expected_timestamp": 65.2
+    },
+    {
+      "term": "retrieval augmented generation",
+      "aliases": ["RAG"],
+      "expected_timestamp": 342.3
+    },
+    {
+      "term": "quantization",
+      "expected_timestamp": 608.9
+    }
+  ]
+}

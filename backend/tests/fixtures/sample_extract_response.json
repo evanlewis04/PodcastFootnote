@@ -1,0 +1,53 @@
+{
+  "video_id": "sample-ai-video",
+  "cached": false,
+  "metadata": {
+    "prompt_version": "glossary-v1",
+    "model": "fixture-model",
+    "cache_status": "fixture",
+    "transcript_segments": 5,
+    "transcript_duration_seconds": 614.4,
+    "term_count": 3,
+    "timestamped_term_count": 2,
+    "low_confidence_term_count": 1,
+    "timestamp_coverage": 0.6667,
+    "low_confidence_rate": 0.3333,
+    "extraction_latency_ms": 420,
+    "created_at": "2026-05-18T00:00:00Z"
+  },
+  "terms": [
+    {
+      "id": "lora",
+      "term": "LoRA",
+      "expansion": "Low-Rank Adaptation",
+      "one_liner": "A lightweight way to fine tune a large AI model.",
+      "deeper": "LoRA trains small adapter matrices instead of changing every model weight. In this transcript, it matters because it lowers the cost and memory needed for fine tuning.",
+      "quote": "LoRA, which stands for Low-Rank Adaptation",
+      "category": "ml_research",
+      "timestamp": 65.2,
+      "confidence": 0.98
+    },
+    {
+      "id": "retrieval-augmented-generation",
+      "term": "retrieval augmented generation",
+      "expansion": null,
+      "one_liner": "A method that gives a model retrieved context before it answers.",
+      "deeper": "The system looks up relevant source material and includes it in the prompt. In this transcript, it is compared with supervised fine tuning as a different way to improve model behavior.",
+      "quote": "compares retrieval augmented generation",
+      "category": "ml_research",
+      "timestamp": 342.3,
+      "confidence": 0.98
+    },
+    {
+      "id": "dropout",
+      "term": "dropout",
+      "expansion": null,
+      "one_liner": "A training technique that randomly disables parts of a neural network.",
+      "deeper": "Dropout can reduce overfitting during training, but it is not present in the sample transcript. This fixture keeps one false positive visible for evaluation tests.",
+      "quote": "dropout",
+      "category": "ml_research",
+      "timestamp": null,
+      "confidence": 0.1
+    }
+  ]
+}

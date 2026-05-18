@@ -30,7 +30,10 @@ def get_cache(video_id: str) -> ExtractResponse | None:
         data: dict[str, Any] = json.load(file)
 
     response = ExtractResponse.model_validate(data)
-    return response.model_copy(update={"cached": True})
+    metadata = None
+    if response.metadata is not None:
+        metadata = response.metadata.model_copy(update={"cache_status": "hit"})
+    return response.model_copy(update={"cached": True, "metadata": metadata})
 
 
 def set_cache(video_id: str, response: ExtractResponse) -> ExtractResponse:

@@ -3,7 +3,7 @@ import json
 import pytest
 
 from backend import storage
-from backend.models import ExtractResponse, TermCard
+from backend.models import ExtractResponse, ExtractionMetadata, TermCard
 
 
 @pytest.fixture()
@@ -17,6 +17,18 @@ def isolated_data_dir(tmp_path, monkeypatch):
 def _response(video_id: str = "abc123") -> ExtractResponse:
     return ExtractResponse(
         video_id=video_id,
+        metadata=ExtractionMetadata(
+            model="test-model",
+            cache_status="miss",
+            transcript_segments=1,
+            transcript_duration_seconds=127.65,
+            term_count=1,
+            timestamped_term_count=1,
+            low_confidence_term_count=0,
+            timestamp_coverage=1,
+            low_confidence_rate=0,
+            extraction_latency_ms=250,
+        ),
         terms=[
             TermCard(
                 id="lora",
@@ -45,6 +57,9 @@ def test_cache_round_trip_marks_loaded_response_cached(isolated_data_dir):
     assert loaded_response.cached is True
     assert loaded_response.video_id == "abc123"
     assert loaded_response.terms[0].term == "LoRA"
+    assert loaded_response.metadata is not None
+    assert loaded_response.metadata.cache_status == "hit"
+    assert loaded_response.metadata.model == "test-model"
 
 
 def test_cache_miss_returns_none(isolated_data_dir):

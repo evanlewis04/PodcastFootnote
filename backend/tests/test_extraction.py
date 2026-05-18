@@ -1,7 +1,13 @@
 import pytest
 from types import SimpleNamespace
 
-from backend.extraction import InvalidModelResponseError, extract_response_text, extract_terms, parse_model_terms
+from backend.extraction import (
+    InvalidModelResponseError,
+    build_extraction_metadata,
+    extract_response_text,
+    extract_terms,
+    parse_model_terms,
+)
 
 
 VALID_MODEL_JSON = """
@@ -86,3 +92,55 @@ def test_extract_terms_resolves_timestamps_from_model_quotes(monkeypatch):
 
     assert response.terms[0].timestamp == 65.2
     assert response.terms[0].confidence == 0.98
+    assert response.metadata is not None
+    assert response.metadata.model == "test-value"
+    assert response.metadata.cache_status == "miss"
+    assert response.metadata.term_count == 1
+    assert response.metadata.timestamp_coverage == 1
+    assert response.metadata.low_confidence_rate == 0
+    assert response.metadata.extraction_latency_ms is not None
+
+
+def test_build_extraction_metadata_counts_sync_and_low_confidence_terms():
+    from backend.models import TermCard, TranscriptSegment
+
+    metadata = build_extraction_metadata(
+        model="test-model",
+        transcript=[
+            TranscriptSegment(start=0, duration=10, text="First segment."),
+            TranscriptSegment(start=25, duration=5, text="Last segment."),
+        ],
+        terms=[
+            TermCard(
+                id="synced",
+                term="Synced",
+                one_liner="A synced term.",
+                deeper="A synced term with confidence.",
+                quote="Synced",
+                category="other",
+                timestamp=1,
+                confidence=0.9,
+            ),
+            TermCard(
+                id="unsynced",
+                term="Unsynced",
+                one_liner="An unsynced term.",
+                deeper="An unsynced term with low confidence.",
+                quote="Missing",
+                category="other",
+                timestamp=None,
+                confidence=0.1,
+            ),
+        ],
+        latency_ms=123,
+    )
+
+    assert metadata.model == "test-model"
+    assert metadata.transcript_segments == 2
+    assert metadata.transcript_duration_seconds == 30
+    assert metadata.term_count == 2
+    assert metadata.timestamped_term_count == 1
+    assert metadata.low_confidence_term_count == 1
+    assert metadata.timestamp_coverage == 0.5
+    assert metadata.low_confidence_rate == 0.5
+    assert metadata.extraction_latency_ms == 123

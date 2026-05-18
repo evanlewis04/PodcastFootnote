@@ -84,10 +84,29 @@ class TermCard(BaseModel):
         return value or None
 
 
+CacheStatus = Literal["hit", "miss", "fixture"]
+
+
+class ExtractionMetadata(BaseModel):
+    prompt_version: str = "glossary-v1"
+    model: Optional[str] = None
+    cache_status: CacheStatus = "miss"
+    transcript_segments: int = Field(default=0, ge=0)
+    transcript_duration_seconds: Optional[float] = Field(default=None, ge=0)
+    term_count: int = Field(default=0, ge=0)
+    timestamped_term_count: int = Field(default=0, ge=0)
+    low_confidence_term_count: int = Field(default=0, ge=0)
+    timestamp_coverage: float = Field(default=0, ge=0, le=1)
+    low_confidence_rate: float = Field(default=0, ge=0, le=1)
+    extraction_latency_ms: Optional[int] = Field(default=None, ge=0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class ExtractResponse(BaseModel):
     video_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     terms: list[TermCard] = Field(default_factory=list)
     cached: bool = False
+    metadata: Optional[ExtractionMetadata] = None
 
     model_config = ConfigDict(validate_assignment=True)
 
