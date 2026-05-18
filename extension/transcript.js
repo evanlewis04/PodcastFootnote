@@ -233,49 +233,120 @@
     await openTranscriptPanel();
     const segmentNodes = await waitForTranscriptSegments();
     const segments = segmentNodes
-      .map((node) => {
-        const timeNode = node.querySelector(".segment-timestamp, yt-formatted-string.segment-timestamp");
-        const textNode = node.querySelector(".segment-text, yt-formatted-string.segment-text");
-        return {
-          start: parseTimestamp(timeNode ? timeNode.textContent : ""),
-          duration: 0,
-          text: textNode ? textNode.textContent.replace(/\s+/g, " ").trim() : "",
-        };
-      })
+      .map(parseDomTranscriptSegment)
       .filter((segment) => segment.text && Number.isFinite(segment.start));
 
     if (!segments.length) {
-      throw new Error("No captions available for this video.");
+      throw new Error("Transcript panel was found, but no readable timestamped segments were available.");
     }
 
     return segments;
   }
 
   async function openTranscriptPanel() {
-    if (document.querySelector("ytd-transcript-segment-renderer")) return;
+    if (hasTranscriptSegments()) return;
+
+    if (await clickTranscriptControl()) return;
+
+    await expandDescription();
+    if (hasTranscriptSegments()) return;
+    if (await clickTranscriptControl()) return;
 
     const buttons = Array.from(document.querySelectorAll("button, yt-button-shape button"));
-    const moreButton = buttons.find((button) => /more actions/i.test(button.getAttribute("aria-label") || ""));
+    const moreButton = buttons.find((button) => /more actions|actions menu/i.test(button.getAttribute("aria-label") || ""));
     if (moreButton) {
       moreButton.click();
       await sleep(300);
-      const menuItems = Array.from(document.querySelectorAll("tp-yt-paper-item, ytd-menu-service-item-renderer"));
-      const transcriptItem = menuItems.find((item) => /show transcript|transcript/i.test(item.textContent || ""));
-      if (transcriptItem) {
-        transcriptItem.click();
-        await sleep(500);
-      }
+      await clickTranscriptControl();
     }
   }
 
   async function waitForTranscriptSegments() {
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
-      const nodes = Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"));
+      const nodes = findTranscriptSegmentNodes();
       if (nodes.length) return nodes;
       await sleep(250);
     }
     return [];
+  }
+
+  function hasTranscriptSegments() {
+    return findTranscriptSegmentNodes().length > 0;
+  }
+
+  function findTranscriptSegmentNodes() {
+    const selectors = [
+      "ytd-transcript-segment-renderer",
+      "ytd-transcript-segment-list-renderer ytd-transcript-segment-renderer",
+      "[target-id='engagement-panel-searchable-transcript'] ytd-transcript-segment-renderer",
+      "[target-id*='transcript'] ytd-transcript-segment-renderer",
+      "ytd-engagement-panel-section-list-renderer ytd-transcript-segment-renderer",
+    ];
+
+    return uniqueElements(selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector))));
+  }
+
+  async function clickTranscriptControl() {
+    const selectors = [
+      "button",
+      "yt-button-shape button",
+      "ytd-button-renderer",
+      "tp-yt-paper-item",
+      "ytd-menu-service-item-renderer",
+      "a",
+    ];
+    const controls = uniqueElements(selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector))));
+    const transcriptControl = controls.find((element) => {
+      const label = [
+        element.getAttribute("aria-label"),
+        element.getAttribute("title"),
+        element.textContent,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return /show transcript|open transcript|transcript/i.test(label) && !/hide transcript|close transcript/i.test(label);
+    });
+
+    if (!transcriptControl) return false;
+    transcriptControl.click();
+    await sleep(700);
+    return hasTranscriptSegments();
+  }
+
+  async function expandDescription() {
+    const buttons = Array.from(document.querySelectorAll("button, yt-button-shape button"));
+    const moreButton = buttons.find((button) => {
+      const label = [button.getAttribute("aria-label"), button.textContent].filter(Boolean).join(" ");
+      return /\bmore\b|show more/i.test(label);
+    });
+
+    if (!moreButton) return;
+    moreButton.click();
+    await sleep(400);
+  }
+
+  function parseDomTranscriptSegment(node) {
+    const timeNode = node.querySelector(".segment-timestamp, yt-formatted-string.segment-timestamp, [class*='timestamp']");
+    const textNode = node.querySelector(".segment-text, yt-formatted-string.segment-text, [class*='segment-text']");
+    const fallback = parseTimestampedText(node.textContent || "");
+
+    return {
+      start: parseTimestamp(timeNode ? timeNode.textContent : fallback.timestampText),
+      duration: 0,
+      text: textNode ? textNode.textContent.replace(/\s+/g, " ").trim() : fallback.text,
+    };
+  }
+
+  function parseTimestampedText(text) {
+    const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+    const match = cleanText.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$/);
+    if (!match) return { timestampText: "", text: cleanText };
+    return { timestampText: match[1], text: match[2].trim() };
+  }
+
+  function uniqueElements(elements) {
+    return Array.from(new Set(elements)).filter((element) => element && element.isConnected);
   }
 
   function parseTimestamp(text) {
